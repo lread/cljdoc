@@ -224,7 +224,8 @@
 
 (comment
 
-  (cljdoc.server.search.artifact-indexer/download-and-index! "data/index" :force)
+  (cljdoc.server.search.artifact-indexer/download-and-index! "data/index" nil :force)
+  (cljdoc.server.search.artifact-indexer/download-and-index! "data/index" nil :force)
 
   (search "data/index" "metosin muunta")
   ;; FIXME metosin:muuntaja comes 6th because the partial match on 'muuntaja' is

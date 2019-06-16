@@ -1,10 +1,12 @@
 (ns cljdoc.server.search.artifact-indexer
   (:require
     [cljdoc.spec :as cljdoc-spec]
+    [cljdoc.server.clojars-stats :as clojars-stats]
     [clojure.edn :as edn]
     [clojure.spec.alpha :as s]
     [clojure.java.io :as io]
     [clojure.string :refer [join]]
+    [clojure.set :as cset]
     [clj-http.lite.client :as http]
     [clojure.tools.logging :as log]
     [cheshire.core :as json])
@@ -18,6 +20,13 @@
            (java.io InputStream)
            (org.apache.lucene.store FSDirectory)
            (java.nio.file Paths)))
+
+
+;; ----------------------------------------------------------------------- DB
+
+(defn download-counts [db-spec])
+
+;; ----------------------------------------------------------------------- indexing
 
 (defn ^FSDirectory fsdir [index-dir] ;; BEWARE: Duplicated in artifact-indexer and search ns
   (FSDirectory/open (Paths/get index-dir (into-array String nil))))
@@ -175,10 +184,23 @@
         artifacts
         create?))))
 
+(defn add-downloads [db-spec artifacts]
+  ;; TODO Try it out, make into a set, join with artifacts
+  ; {:downloads 135527790, :group_id hiccup-bridge, :artifact_id hiccup-bridge}
+  (let [downloads (->>
+                    (clojars-stats/downloads (clojars-stats/->ClojarsStats db-spec)))]
+    ;; FIXME We want left join!!!
+    (cset/join artifacts downloads)))
+
 (defn download-and-index!
-  ([^String index-dir] (download-and-index! index-dir false))
-  ([^String index-dir force?]
+  ([^String index-dir db-spec] (download-and-index! index-dir db-spec false))
+  ([^String index-dir db-spec force?]
    (log/info "Download & index starting...")
+   (->> (into
+          (load-clojars-artifacts force?)
+          (load-maven-central-artifacts))
+        (add-downloads db-spec)
+        (index! index-dir))
    (index! index-dir (into
                        (load-clojars-artifacts force?)
                        (load-maven-central-artifacts)))))
@@ -188,3 +210,7 @@
 
 (s/fdef index-artifact
         :args (s/cat :artifact ::cljdoc-spec/artifact))
+
+(comment
+
+  (def db-spec {:classname "org.sqlite.JDBC", :subprotocol "sqlite", :subname "data/cljdoc.db.sqlite"}))
